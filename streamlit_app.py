@@ -4,7 +4,6 @@ import subprocess
 import sys
 
 import joblib
-import numpy as np
 import pandas as pd
 import plotly.express as px
 import streamlit as st
@@ -28,7 +27,6 @@ TELCO_CSV_PATH = "data/telco_customer_churn.csv"
 TELCO_XLSX_PATH = "Telco_customer_churn.xlsx"
 
 SYNTHETIC_MODEL_PATH = "models/churn_model.joblib"
-TELCO_MODEL_PATH = "models/telco_churn_model.joblib"
 
 METRICS_PATH = "outputs/metrics.json"
 TELCO_METRICS_PATH = "outputs/telco_metrics.json"
@@ -38,45 +36,49 @@ TELCO_WATCHLIST_PATH = "outputs/telco_top_50_churn_watchlist.csv"
 
 
 # =========================================================
-# THEME COLORS
+# COLORS
 # =========================================================
 PRIMARY = "#0F6E9C"
-PRIMARY_DARK = "#0B5A7C"
-PRIMARY_LIGHT = "#DDF2FB"
+PRIMARY_DARK = "#084C70"
+PRIMARY_MID = "#147FB5"
+PRIMARY_LIGHT = "#E7F5FB"
 SECONDARY = "#1E88E5"
-ACCENT = "#4FC3F7"
+ACCENT = "#67C7F7"
 
-BG = "#F4F7FB"
+BG = "#F3F7FA"
 CARD = "#FFFFFF"
 TEXT = "#102A43"
-MUTED = "#486581"
-BORDER = "#D9E2EC"
+MUTED = "#5B7083"
+BORDER = "#D8E4EC"
 
-LOW_BG = "#E6F7EC"
-LOW_TEXT = "#166534"
-MED_BG = "#FFF8DB"
+LOW_BG = "#E7F8EF"
+LOW_TEXT = "#12703A"
+MED_BG = "#FFF8DD"
 MED_TEXT = "#9A6700"
 HIGH_BG = "#FDECEC"
-HIGH_TEXT = "#B42318"
+HIGH_TEXT = "#A61B1B"
 
 PLOT_BLUE = "#1F84C7"
-PLOT_BLUE_LIGHT = "#7EC8F8"
-PLOT_RED = "#EF5350"
-PLOT_GRID = "#EAF1F7"
+PLOT_BLUE_2 = "#67C7F7"
+PLOT_BLUE_3 = "#0F6E9C"
+PLOT_NAVY = "#084C70"
+PLOT_ORANGE = "#F59E0B"
+PLOT_GRID = "#E8EEF3"
 
 BLUE_SCALE = [
-    "#DDF2FB",
-    "#B9E3F9",
-    "#8FD0F4",
-    "#64B8EC",
-    "#3B9DDF",
-    "#1F84C7",
-    "#0F6E9C"
+    "#E7F5FB",
+    "#C9EAF8",
+    "#9ED8F2",
+    "#67C7F7",
+    "#2C9CDB",
+    "#147FB5",
+    "#0F6E9C",
+    "#084C70"
 ]
 
 
 # =========================================================
-# GLOBAL CSS
+# PREMIUM CSS
 # =========================================================
 st.markdown(
     f"""
@@ -95,29 +97,76 @@ st.markdown(
         background: rgba(0,0,0,0);
     }}
 
+    .block-container {{
+        padding-top: 1.2rem;
+        padding-bottom: 2.5rem;
+        max-width: 1520px;
+    }}
+
     section[data-testid="stSidebar"] {{
-        background: linear-gradient(180deg, {PRIMARY_DARK} 0%, {PRIMARY} 100%);
+        background: linear-gradient(180deg, #063E5C 0%, {PRIMARY_DARK} 46%, {PRIMARY} 100%);
         color: white;
-        border-right: 1px solid rgba(255,255,255,0.08);
+        border-right: 1px solid rgba(255,255,255,0.12);
+        box-shadow: 6px 0 18px rgba(8,76,112,0.10);
     }}
 
     section[data-testid="stSidebar"] * {{
         color: white !important;
     }}
 
-    .block-container {{
-        padding-top: 1.4rem;
-        padding-bottom: 2rem;
-        max-width: 1500px;
+    .sidebar-logo-card {{
+        background: rgba(255,255,255,0.14);
+        border: 1px solid rgba(255,255,255,0.18);
+        border-radius: 22px;
+        padding: 18px 16px;
+        margin-bottom: 18px;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.16);
+    }}
+
+    .sidebar-title {{
+        font-size: 1.35rem;
+        font-weight: 850;
+        color: white;
+        margin-bottom: 6px;
+    }}
+
+    .sidebar-subtitle {{
+        font-size: 0.85rem;
+        color: #DDF2FB;
+        line-height: 1.45;
+    }}
+
+    .sidebar-card {{
+        background: rgba(255,255,255,0.11);
+        border: 1px solid rgba(255,255,255,0.14);
+        border-radius: 18px;
+        padding: 15px;
+        margin-bottom: 16px;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.12);
+    }}
+
+    .sidebar-card h3 {{
+        color: white !important;
+        font-size: 1rem;
+        margin-bottom: 8px;
+    }}
+
+    .sidebar-item {{
+        background: rgba(255,255,255,0.10);
+        padding: 9px 11px;
+        border-radius: 12px;
+        margin: 7px 0;
+        font-size: 0.90rem;
+        border: 1px solid rgba(255,255,255,0.09);
     }}
 
     .hero {{
-        background: linear-gradient(90deg, {PRIMARY_DARK}, {PRIMARY});
-        border-radius: 24px;
+        background: linear-gradient(90deg, {PRIMARY_DARK}, {PRIMARY_MID});
+        border-radius: 26px;
         padding: 28px 36px;
         color: white;
-        box-shadow: 0 10px 30px rgba(15,110,156,0.22);
-        margin-bottom: 20px;
+        box-shadow: 0 12px 30px rgba(8,76,112,0.22);
+        margin-bottom: 18px;
     }}
 
     .hero-title {{
@@ -126,14 +175,26 @@ st.markdown(
         margin: 0;
         text-align: center;
         color: white;
+        letter-spacing: -0.4px;
     }}
 
     .hero-sub {{
         font-size: 1rem;
-        opacity: 0.95;
+        opacity: 0.96;
         margin-top: 8px;
         text-align: center;
         color: #EAF8FF;
+    }}
+
+    .nav-info {{
+        background: white;
+        border: 1px solid {BORDER};
+        border-radius: 16px;
+        padding: 11px 16px;
+        box-shadow: 0 6px 18px rgba(16,42,67,0.06);
+        font-weight: 750;
+        color: {PRIMARY_DARK};
+        margin-bottom: 18px;
     }}
 
     .section-title {{
@@ -152,20 +213,20 @@ st.markdown(
     }}
 
     .kpi-card {{
-        background: linear-gradient(180deg, {PRIMARY}, {PRIMARY_DARK});
+        background: linear-gradient(180deg, {PRIMARY_MID}, {PRIMARY_DARK});
         color: white;
         border-radius: 20px;
         padding: 20px;
         text-align: center;
-        box-shadow: 0 10px 22px rgba(15,110,156,0.20);
-        min-height: 125px;
+        box-shadow: 0 10px 22px rgba(8,76,112,0.18);
+        min-height: 122px;
         border: none;
     }}
 
     .kpi-label {{
         font-size: 0.9rem;
         opacity: 0.95;
-        font-weight: 650;
+        font-weight: 700;
         margin-bottom: 14px;
         color: #EAF8FF;
     }}
@@ -194,7 +255,7 @@ st.markdown(
 
     .risk-value {{
         font-weight: 850;
-        font-size: 2rem;
+        font-size: 1.85rem;
     }}
 
     .chart-shell {{
@@ -202,15 +263,15 @@ st.markdown(
         border-radius: 20px;
         border: 1px solid {BORDER};
         box-shadow: 0 8px 24px rgba(16,42,67,0.07);
-        padding: 16px 16px 8px 16px;
+        padding: 16px;
         margin-bottom: 18px;
     }}
 
     .chart-title {{
-        font-size: 1.1rem;
+        font-size: 1.08rem;
         font-weight: 850;
         color: {PRIMARY_DARK};
-        margin-bottom: 12px;
+        margin-bottom: 10px;
     }}
 
     .insight-card {{
@@ -223,8 +284,8 @@ st.markdown(
     }}
 
     .insight-box {{
-        background: #EEF7FB;
-        border-left: 5px solid {PRIMARY};
+        background: #EEF8FD;
+        border-left: 5px solid {PRIMARY_MID};
         border-radius: 14px;
         padding: 14px;
         margin-bottom: 12px;
@@ -247,32 +308,27 @@ st.markdown(
         padding: 14px;
         text-align: center;
         color: {PRIMARY_DARK};
-        font-weight: 650;
+        font-weight: 700;
         margin-top: 24px;
-    }}
-
-    .sidebar-card {{
-        background: rgba(255,255,255,0.10);
-        border: 1px solid rgba(255,255,255,0.14);
-        border-radius: 16px;
-        padding: 14px;
-        margin-bottom: 16px;
+        box-shadow: 0 6px 18px rgba(16,42,67,0.05);
     }}
 
     .stButton > button {{
-        background: linear-gradient(90deg, {PRIMARY_DARK}, {PRIMARY});
-        color: white;
+        background: linear-gradient(90deg, {PRIMARY_DARK}, {PRIMARY_MID});
+        color: white !important;
         border: none;
-        border-radius: 12px;
-        font-weight: 750;
-        padding: 0.58rem 1rem;
-        box-shadow: 0 6px 16px rgba(15,110,156,0.20);
+        border-radius: 14px;
+        font-weight: 800;
+        padding: 0.65rem 1rem;
+        box-shadow: 0 8px 18px rgba(8,76,112,0.18);
+        width: 100%;
     }}
 
     .stButton > button:hover {{
-        background: linear-gradient(90deg, {PRIMARY}, {SECONDARY});
-        color: white;
+        background: linear-gradient(90deg, {PRIMARY_MID}, {SECONDARY});
+        color: white !important;
         border: none;
+        transform: translateY(-1px);
     }}
 
     .stSelectbox label,
@@ -281,15 +337,16 @@ st.markdown(
     .stTextInput label,
     .stMultiSelect label {{
         color: {TEXT} !important;
-        font-weight: 750 !important;
+        font-weight: 800 !important;
     }}
 
-    .stMarkdown, p, label, div {{
-        color: {TEXT};
+    .stSlider [data-baseweb="slider"] div {{
+        color: {PRIMARY_DARK} !important;
     }}
 
-    h1, h2, h3, h4, h5 {{
-        color: {TEXT};
+    .stSlider div[role="slider"] {{
+        background-color: {PRIMARY_MID} !important;
+        border-color: {PRIMARY_MID} !important;
     }}
 
     div[data-testid="stDataFrame"] {{
@@ -303,28 +360,21 @@ st.markdown(
         border-radius: 14px;
     }}
 
-    div[role="radiogroup"] label {{
-        background: white !important;
-        border: 1px solid {BORDER} !important;
-        border-radius: 12px !important;
-        padding: 10px 16px !important;
-        color: {TEXT} !important;
-        font-weight: 650 !important;
-        box-shadow: 0 3px 10px rgba(16,42,67,0.05);
+    .stMarkdown, p, label, div {{
+        color: {TEXT};
     }}
 
-    div[role="radiogroup"] label:has(input:checked) {{
-        background: linear-gradient(90deg, {PRIMARY_DARK}, {PRIMARY}) !important;
-        color: white !important;
-        border: none !important;
+    h1, h2, h3, h4, h5 {{
+        color: {TEXT};
     }}
 
-    div[data-baseweb="radio"] > div {{
-        gap: 12px !important;
+    /* Hide any radio input visuals if Streamlit adds them anywhere */
+    div[role="radiogroup"] input {{
+        display: none !important;
     }}
 
-    .nav-wrap {{
-        margin-bottom: 22px;
+    div[role="radiogroup"] label > div:first-child {{
+        display: none !important;
     }}
     </style>
     """,
@@ -333,7 +383,7 @@ st.markdown(
 
 
 # =========================================================
-# HELPER FUNCTIONS
+# HELPERS
 # =========================================================
 def ensure_folders():
     for folder in ["data", "models", "outputs", "images", "src"]:
@@ -425,8 +475,7 @@ def find_column(df, possible_names):
 
 
 def detect_churn_column(df):
-    possible = ["churn", "churn_label", "customer_status", "churn_value"]
-    return find_column(df, possible)
+    return find_column(df, ["churn", "churn_label", "customer_status", "churn_value"])
 
 
 def create_churn_binary(df, churn_col):
@@ -435,9 +484,7 @@ def create_churn_binary(df, churn_col):
     if churn_col == "customer_status":
         return values.apply(lambda x: 1 if "churn" in x else 0)
 
-    return values.apply(
-        lambda x: 1 if x in ["yes", "1", "true", "churned"] else 0
-    )
+    return values.apply(lambda x: 1 if x in ["yes", "1", "true", "churned"] else 0)
 
 
 def convert_telco_excel_to_csv_if_needed():
@@ -491,29 +538,36 @@ def powerbi_layout(fig):
         template="plotly_white",
         paper_bgcolor="white",
         plot_bgcolor="white",
-        font=dict(color=TEXT, family="Segoe UI"),
-        margin=dict(l=20, r=20, t=20, b=20),
+        font=dict(color=TEXT, family="Segoe UI", size=12),
+        margin=dict(l=28, r=28, t=18, b=30),
         legend=dict(
-            bgcolor="rgba(0,0,0,0)",
+            bgcolor="rgba(255,255,255,0)",
             font=dict(color=TEXT)
         ),
-        xaxis=dict(
-            showgrid=True,
-            gridcolor=PLOT_GRID,
-            zeroline=False,
-            linecolor=BORDER,
-            tickfont=dict(color=MUTED),
-            title_font=dict(color=TEXT)
-        ),
-        yaxis=dict(
-            showgrid=True,
-            gridcolor=PLOT_GRID,
-            zeroline=False,
-            linecolor=BORDER,
-            tickfont=dict(color=MUTED),
-            title_font=dict(color=TEXT)
+        coloraxis_colorbar=dict(
+            title_font=dict(color=TEXT),
+            tickfont=dict(color=TEXT)
         )
     )
+
+    fig.update_xaxes(
+        showgrid=True,
+        gridcolor=PLOT_GRID,
+        zeroline=False,
+        linecolor=BORDER,
+        tickfont=dict(color=MUTED),
+        title_font=dict(color=TEXT)
+    )
+
+    fig.update_yaxes(
+        showgrid=True,
+        gridcolor=PLOT_GRID,
+        zeroline=False,
+        linecolor=BORDER,
+        tickfont=dict(color=MUTED),
+        title_font=dict(color=TEXT)
+    )
+
     return fig
 
 
@@ -529,6 +583,60 @@ def risk_action(prob):
 
 
 # =========================================================
+# SIDEBAR
+# =========================================================
+with st.sidebar:
+    st.markdown(
+        """
+        <div class="sidebar-logo-card">
+            <div class="sidebar-title">📊 Dashboard Controls</div>
+            <div class="sidebar-subtitle">Customer churn analytics and retention intelligence</div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.markdown(
+        """
+        <div class="sidebar-card">
+            <h3>Project Summary</h3>
+            <div class="sidebar-subtitle">
+            This dashboard predicts customer churn, identifies high-risk customers,
+            explains churn drivers, and suggests retention actions.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.markdown(
+        """
+        <div class="sidebar-card">
+            <h3>Dashboard Sections</h3>
+            <div class="sidebar-item">✅ Synthetic churn simulation</div>
+            <div class="sidebar-item">✅ IBM Telco dataset analysis</div>
+            <div class="sidebar-item">✅ Single customer prediction</div>
+            <div class="sidebar-item">✅ Risk segmentation</div>
+            <div class="sidebar-item">✅ Retention actions</div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.markdown(
+        """
+        <div class="sidebar-card">
+            <h3>Dataset Note</h3>
+            <div class="sidebar-subtitle">
+            IBM Telco dataset is a public dataset used for educational and portfolio purposes.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+
+# =========================================================
 # HEADER
 # =========================================================
 st.markdown(
@@ -536,7 +644,7 @@ st.markdown(
     <div class="hero">
         <div class="hero-title">📉 Customer Churn Prediction Dashboard</div>
         <div class="hero-sub">
-            Industry-style customer churn analytics, risk segmentation, retention actions, and ML model monitoring
+            Premium churn analytics dashboard for customer retention, business insights, and ML scoring
         </div>
     </div>
     """,
@@ -545,57 +653,43 @@ st.markdown(
 
 
 # =========================================================
-# SIDEBAR
+# BUTTON NAVIGATION - NO RED RADIO DOTS
 # =========================================================
-with st.sidebar:
-    st.markdown("## 📊 Dashboard Controls")
-    st.markdown("---")
+if "page" not in st.session_state:
+    st.session_state.page = "synthetic"
 
-    st.markdown('<div class="sidebar-card">', unsafe_allow_html=True)
-    st.markdown("### Project Summary")
-    st.write(
-        "This dashboard predicts customer churn, identifies high-risk customers, explains churn drivers, and suggests retention actions."
-    )
-    st.markdown("</div>", unsafe_allow_html=True)
+nav1, nav2, nav3 = st.columns(3)
 
-    st.markdown('<div class="sidebar-card">', unsafe_allow_html=True)
-    st.markdown("### Dashboard Sections")
-    st.write("✅ Synthetic churn simulation")
-    st.write("✅ IBM Telco dataset analysis")
-    st.write("✅ Single customer prediction")
-    st.write("✅ Risk segmentation")
-    st.write("✅ Retention actions")
-    st.markdown("</div>", unsafe_allow_html=True)
+with nav1:
+    if st.button("📊 Synthetic Churn Dashboard"):
+        st.session_state.page = "synthetic"
 
-    st.markdown('<div class="sidebar-card">', unsafe_allow_html=True)
-    st.markdown("### Dataset Note")
-    st.info("IBM Telco dataset is a public dataset used for educational and portfolio purposes.")
-    st.markdown("</div>", unsafe_allow_html=True)
+with nav2:
+    if st.button("🏢 IBM Telco Dataset"):
+        st.session_state.page = "telco"
 
+with nav3:
+    if st.button("🎯 Single Customer Prediction"):
+        st.session_state.page = "prediction"
 
-# =========================================================
-# NAVIGATION
-# =========================================================
-st.markdown('<div class="nav-wrap">', unsafe_allow_html=True)
+current_label = {
+    "synthetic": "📊 Synthetic Churn Dashboard",
+    "telco": "🏢 IBM Telco Dataset",
+    "prediction": "🎯 Single Customer Prediction"
+}[st.session_state.page]
 
-page = st.radio(
-    "Navigation",
-    [
-        "📊 Synthetic Churn Dashboard",
-        "🏢 IBM Telco Dataset",
-        "🎯 Single Customer Prediction"
-    ],
-    horizontal=True,
-    label_visibility="collapsed"
+st.markdown(
+    f"""
+    <div class="nav-info">Current View: {current_label}</div>
+    """,
+    unsafe_allow_html=True
 )
-
-st.markdown('</div>', unsafe_allow_html=True)
 
 
 # =========================================================
 # PAGE 1: SYNTHETIC DASHBOARD
 # =========================================================
-if page == "📊 Synthetic Churn Dashboard":
+if st.session_state.page == "synthetic":
     section_title("Synthetic Customer Churn Dashboard")
 
     ready = ensure_synthetic_ready()
@@ -656,7 +750,7 @@ if page == "📊 Synthetic Churn Dashboard":
             color="Churn",
             color_discrete_map={
                 "No Churn": PLOT_BLUE,
-                "Churn": PLOT_RED
+                "Churn": PLOT_ORANGE
             }
         )
 
@@ -673,9 +767,9 @@ if page == "📊 Synthetic Churn Dashboard":
             barmode="overlay",
             color_discrete_map={
                 0: PLOT_BLUE,
-                1: PLOT_RED
+                1: PLOT_ORANGE
             },
-            opacity=0.85
+            opacity=0.82
         )
 
         fig = powerbi_layout(fig)
@@ -693,9 +787,9 @@ if page == "📊 Synthetic Churn Dashboard":
             barmode="overlay",
             color_discrete_map={
                 0: PLOT_BLUE,
-                1: PLOT_RED
+                1: PLOT_ORANGE
             },
-            opacity=0.85
+            opacity=0.82
         )
 
         fig = powerbi_layout(fig)
@@ -775,7 +869,7 @@ if page == "📊 Synthetic Churn Dashboard":
 # =========================================================
 # PAGE 2: IBM TELCO DASHBOARD
 # =========================================================
-elif page == "🏢 IBM Telco Dataset":
+elif st.session_state.page == "telco":
     section_title("IBM Telco Customer Churn Analysis Dashboard")
 
     telco_ready = convert_telco_excel_to_csv_if_needed()
@@ -805,39 +899,47 @@ elif page == "🏢 IBM Telco Dataset":
     satisfaction_col = find_column(telco, ["satisfaction_score"])
 
     with st.sidebar:
-        with st.expander("IBM Telco Filters", expanded=True):
-            selected_gender = "All"
-            selected_contract = "All"
-            selected_internet = "All"
-            selected_payment = "All"
+        st.markdown(
+            """
+            <div class="sidebar-card">
+                <h3>IBM Telco Filters</h3>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
-            if gender_col:
-                selected_gender = st.selectbox(
-                    "Gender",
-                    ["All"] + sorted(telco[gender_col].dropna().astype(str).unique().tolist()),
-                    key="gender_filter"
-                )
+        selected_gender = "All"
+        selected_contract = "All"
+        selected_internet = "All"
+        selected_payment = "All"
 
-            if contract_col:
-                selected_contract = st.selectbox(
-                    "Contract Type",
-                    ["All"] + sorted(telco[contract_col].dropna().astype(str).unique().tolist()),
-                    key="contract_filter"
-                )
+        if gender_col:
+            selected_gender = st.selectbox(
+                "Gender",
+                ["All"] + sorted(telco[gender_col].dropna().astype(str).unique().tolist()),
+                key="gender_filter"
+            )
 
-            if internet_col:
-                selected_internet = st.selectbox(
-                    "Internet Service",
-                    ["All"] + sorted(telco[internet_col].dropna().astype(str).unique().tolist()),
-                    key="internet_filter"
-                )
+        if contract_col:
+            selected_contract = st.selectbox(
+                "Contract Type",
+                ["All"] + sorted(telco[contract_col].dropna().astype(str).unique().tolist()),
+                key="contract_filter"
+            )
 
-            if payment_col:
-                selected_payment = st.selectbox(
-                    "Payment Method",
-                    ["All"] + sorted(telco[payment_col].dropna().astype(str).unique().tolist()),
-                    key="payment_filter"
-                )
+        if internet_col:
+            selected_internet = st.selectbox(
+                "Internet Service",
+                ["All"] + sorted(telco[internet_col].dropna().astype(str).unique().tolist()),
+                key="internet_filter"
+            )
+
+        if payment_col:
+            selected_payment = st.selectbox(
+                "Payment Method",
+                ["All"] + sorted(telco[payment_col].dropna().astype(str).unique().tolist()),
+                key="payment_filter"
+            )
 
     filtered = telco.copy()
 
@@ -910,7 +1012,7 @@ elif page == "🏢 IBM Telco Dataset":
             color="Churn",
             color_discrete_map={
                 "Retained": PLOT_BLUE,
-                "Churned": PLOT_RED
+                "Churned": PLOT_ORANGE
             }
         )
 
@@ -1019,7 +1121,7 @@ elif page == "🏢 IBM Telco Dataset":
                 color="churn_binary",
                 color_discrete_map={
                     0: PLOT_BLUE,
-                    1: PLOT_RED
+                    1: PLOT_ORANGE
                 }
             )
 
@@ -1042,9 +1144,9 @@ elif page == "🏢 IBM Telco Dataset":
                 barmode="overlay",
                 color_discrete_map={
                     0: PLOT_BLUE,
-                    1: PLOT_RED
+                    1: PLOT_ORANGE
                 },
-                opacity=0.85
+                opacity=0.82
             )
 
             fig = powerbi_layout(fig)
@@ -1166,7 +1268,7 @@ elif page == "🏢 IBM Telco Dataset":
 # =========================================================
 # PAGE 3: SINGLE CUSTOMER PREDICTION
 # =========================================================
-elif page == "🎯 Single Customer Prediction":
+elif st.session_state.page == "prediction":
     section_title("Predict One Customer")
 
     st.markdown(
@@ -1241,7 +1343,14 @@ elif page == "🎯 Single Customer Prediction":
     row["email_ctr"] = row["email_clicks"] / (row["email_opens"] + 0.001)
     row["price_to_tenure"] = row["billing_amount"] / (row["tenure_months"] + 0.001)
 
-    if st.button("Predict Churn"):
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    predict_col, _ = st.columns([1, 4])
+
+    with predict_col:
+        clicked = st.button("Predict Churn")
+
+    if clicked:
         prob = float(model.predict_proba(row)[0, 1])
         risk, action = risk_action(prob)
 
