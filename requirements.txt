@@ -4,8 +4,9 @@ numpy
 scikit-learn
 joblib
 matplotlib
+seaborn
 plotly
+openpyxl
 fastapi
 uvicorn
 pydantic
-openpyxl
