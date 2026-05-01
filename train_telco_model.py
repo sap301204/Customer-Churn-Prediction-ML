@@ -1,8 +1,10 @@
 import os
 import json
 import joblib
+import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 from sklearn.model_selection import train_test_split
 from sklearn.compose import ColumnTransformer
@@ -18,18 +20,55 @@ from sklearn.metrics import (
     roc_auc_score,
     average_precision_score,
     confusion_matrix,
-    ConfusionMatrixDisplay,
-    RocCurveDisplay,
-    PrecisionRecallDisplay,
+    roc_curve,
+    auc,
+    precision_recall_curve,
 )
 
 
+# ==========================================================
+# PATH CONFIG
+# ==========================================================
 DATA_PATH = "data/telco_customer_churn.csv"
 MODEL_PATH = "models/telco_churn_model.joblib"
 OUTPUT_DIR = "outputs"
 IMAGE_DIR = "images"
 
 
+# ==========================================================
+# PREMIUM CHART STYLE
+# ==========================================================
+BLUE = "#0F6E9C"
+LIGHT_BLUE = "#8FD0F4"
+DARK_BLUE = "#0B5A7C"
+RED = "#EF5350"
+GRID = "#D9E2EC"
+TEXT = "#102A43"
+
+
+def apply_premium_chart_style():
+    plt.rcParams.update({
+        "figure.facecolor": "white",
+        "axes.facecolor": "white",
+        "axes.edgecolor": GRID,
+        "axes.labelcolor": TEXT,
+        "xtick.color": TEXT,
+        "ytick.color": TEXT,
+        "text.color": TEXT,
+        "font.size": 11,
+        "axes.titleweight": "bold",
+        "axes.titlesize": 15,
+        "axes.labelsize": 11,
+        "legend.frameon": False,
+        "grid.color": GRID,
+        "grid.linestyle": "--",
+        "grid.alpha": 0.6,
+    })
+
+
+# ==========================================================
+# DATA CLEANING
+# ==========================================================
 def clean_column_names(df):
     df = df.copy()
     df.columns = (
@@ -56,18 +95,17 @@ def find_target_column(df):
             return col
 
     raise ValueError(
-        "Target column not found. Please check if your dataset has Churn, Customer Status, Churn Label, or Churn Value."
+        "Target column not found. Expected Churn, Customer Status, Churn Label, or Churn Value."
     )
 
 
 def prepare_target(df, target_col):
-    df = df.copy()
-    target_values = df[target_col].astype(str).str.lower().str.strip()
+    values = df[target_col].astype(str).str.lower().str.strip()
 
     if target_col == "customer_status":
-        y = target_values.apply(lambda x: 1 if "churn" in x else 0)
+        y = values.apply(lambda x: 1 if "churn" in x else 0)
     else:
-        y = target_values.map({
+        y = values.map({
             "yes": 1,
             "no": 0,
             "1": 1,
@@ -80,8 +118,10 @@ def prepare_target(df, target_col):
         })
 
     if y.isna().sum() > 0:
-        unknown_values = target_values[y.isna()].unique()
-        raise ValueError(f"Some target values could not be converted: {unknown_values}")
+        unknown_values = values[y.isna()].unique()
+        raise ValueError(
+            f"Some target values could not be converted: {unknown_values}"
+        )
 
     return y.astype(int)
 
@@ -94,13 +134,12 @@ def drop_unwanted_columns(df, target_col):
         "churn_category",
         "churn_reason",
         "churn_score",
-        "cltv",
         "customer_status",
         "churn_label",
         "churn_value",
     ]
 
-    id_location_cols = [
+    location_or_id_cols = [
         "zip_code",
         "zip",
         "lat_long",
@@ -108,7 +147,13 @@ def drop_unwanted_columns(df, target_col):
         "longitude",
     ]
 
-    drop_cols = leakage_cols + id_location_cols
+    # CLTV can be either useful or leakage depending on dataset.
+    # For portfolio simplicity, we drop it to avoid target leakage concerns.
+    business_post_outcome_cols = [
+        "cltv"
+    ]
+
+    drop_cols = leakage_cols + location_or_id_cols + business_post_outcome_cols
     existing_cols = [col for col in drop_cols if col in df.columns]
 
     return df.drop(columns=existing_cols)
@@ -116,9 +161,8 @@ def drop_unwanted_columns(df, target_col):
 
 def convert_numeric_columns(X):
     """
-    Safely convert columns that are actually numeric.
-    Keeps text columns as categorical.
-    This avoids pandas errors and prevents destroying categorical features.
+    Safely converts columns that are mostly numeric.
+    Text columns remain categorical.
     """
     X = X.copy()
 
@@ -134,7 +178,7 @@ def convert_numeric_columns(X):
 
             converted = pd.to_numeric(cleaned, errors="coerce")
 
-            # Convert only if most values are numeric
+            # Convert only if most non-null values are numeric
             if converted.notna().mean() > 0.80:
                 X[col] = converted
             else:
@@ -143,7 +187,21 @@ def convert_numeric_columns(X):
     return X
 
 
-def add_retention_action(row):
+# ==========================================================
+# BUSINESS LOGIC
+# ==========================================================
+def assign_risk_segment(prob):
+    if prob >= 0.70:
+        return "Critical Risk"
+    elif prob >= 0.50:
+        return "High Risk"
+    elif prob >= 0.25:
+        return "Medium Risk"
+    else:
+        return "Low Risk"
+
+
+def recommend_retention_action(row):
     prob = row["churn_probability"]
 
     if prob >= 0.70:
@@ -156,6 +214,184 @@ def add_retention_action(row):
         return "Regular engagement email"
 
 
+def find_main_reason(row):
+    if "contract" in row and str(row["contract"]).lower().strip() == "month-to-month":
+        return "Month-to-month contract"
+    elif "tenure_months" in row and row["tenure_months"] <= 3:
+        return "Low tenure customer"
+    elif "monthly_charges" in row and row["monthly_charges"] >= 80:
+        return "High monthly charges"
+    elif "tech_support" in row and str(row["tech_support"]).lower().strip() == "no":
+        return "No tech support"
+    elif "online_security" in row and str(row["online_security"]).lower().strip() == "no":
+        return "No online security"
+    elif "payment_method" in row and "electronic" in str(row["payment_method"]).lower():
+        return "Electronic check payment risk"
+    else:
+        return "Multiple churn indicators"
+
+
+def lift_at_k(y_true, y_proba, k=0.10):
+    y_true = pd.Series(y_true).reset_index(drop=True)
+    y_proba = pd.Series(y_proba).reset_index(drop=True)
+
+    top_k_count = max(1, int(len(y_true) * k))
+    top_indices = np.argsort(-y_proba)[:top_k_count]
+
+    top_churn_rate = y_true.iloc[top_indices].mean()
+    overall_churn_rate = y_true.mean()
+
+    if overall_churn_rate == 0:
+        return 0
+
+    return top_churn_rate / overall_churn_rate
+
+
+# ==========================================================
+# PLOTS
+# ==========================================================
+def save_confusion_matrix(y_test, y_pred):
+    apply_premium_chart_style()
+
+    cm = confusion_matrix(y_test, y_pred)
+
+    plt.figure(figsize=(6, 5))
+    sns.heatmap(
+        cm,
+        annot=True,
+        fmt="d",
+        cmap="Blues",
+        cbar=False,
+        linewidths=0.5,
+        linecolor=GRID,
+        annot_kws={"size": 13, "weight": "bold", "color": TEXT}
+    )
+
+    plt.title("Confusion Matrix - IBM Telco Churn Model")
+    plt.xlabel("Predicted Label")
+    plt.ylabel("Actual Label")
+    plt.tight_layout()
+    plt.savefig(
+        f"{IMAGE_DIR}/telco_confusion_matrix.png",
+        dpi=170,
+        bbox_inches="tight"
+    )
+    plt.close()
+
+
+def save_roc_curve(y_test, y_proba):
+    apply_premium_chart_style()
+
+    fpr, tpr, _ = roc_curve(y_test, y_proba)
+    roc_auc_value = auc(fpr, tpr)
+
+    plt.figure(figsize=(7, 5))
+    plt.plot(
+        fpr,
+        tpr,
+        color=BLUE,
+        linewidth=3,
+        label=f"ROC-AUC = {roc_auc_value:.3f}"
+    )
+    plt.plot(
+        [0, 1],
+        [0, 1],
+        color="#94A3B8",
+        linestyle="--",
+        linewidth=2
+    )
+
+    plt.title("ROC Curve - IBM Telco Churn Model")
+    plt.xlabel("False Positive Rate")
+    plt.ylabel("True Positive Rate")
+    plt.grid(True)
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(
+        f"{IMAGE_DIR}/telco_roc_curve.png",
+        dpi=170,
+        bbox_inches="tight"
+    )
+    plt.close()
+
+
+def save_pr_curve(y_test, y_proba):
+    apply_premium_chart_style()
+
+    precision, recall, _ = precision_recall_curve(y_test, y_proba)
+    pr_auc_value = average_precision_score(y_test, y_proba)
+
+    plt.figure(figsize=(7, 5))
+    plt.plot(
+        recall,
+        precision,
+        color=BLUE,
+        linewidth=3,
+        label=f"PR-AUC = {pr_auc_value:.3f}"
+    )
+
+    plt.title("Precision-Recall Curve - IBM Telco Churn Model")
+    plt.xlabel("Recall")
+    plt.ylabel("Precision")
+    plt.grid(True)
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(
+        f"{IMAGE_DIR}/telco_pr_curve.png",
+        dpi=170,
+        bbox_inches="tight"
+    )
+    plt.close()
+
+
+def save_feature_importance(model_pipeline):
+    apply_premium_chart_style()
+
+    try:
+        feature_names = model_pipeline.named_steps["preprocessor"].get_feature_names_out()
+        importances = model_pipeline.named_steps["model"].feature_importances_
+
+        feature_importance = pd.DataFrame({
+            "feature": feature_names,
+            "importance": importances
+        }).sort_values("importance", ascending=False)
+
+        feature_importance.to_csv(
+            f"{OUTPUT_DIR}/telco_feature_importance.csv",
+            index=False
+        )
+
+        top_features = feature_importance.head(15).sort_values(
+            "importance",
+            ascending=True
+        )
+
+        plt.figure(figsize=(9, 6))
+        plt.barh(
+            top_features["feature"],
+            top_features["importance"],
+            color=BLUE
+        )
+
+        plt.title("Top Feature Importance - IBM Telco Churn Model")
+        plt.xlabel("Importance Score")
+        plt.ylabel("Feature")
+        plt.grid(axis="x")
+        plt.tight_layout()
+        plt.savefig(
+            f"{IMAGE_DIR}/telco_feature_importance.png",
+            dpi=170,
+            bbox_inches="tight"
+        )
+        plt.close()
+
+    except Exception as e:
+        print("Feature importance generation skipped:", str(e))
+
+
+# ==========================================================
+# MAIN TRAINING
+# ==========================================================
 def main():
     os.makedirs("models", exist_ok=True)
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -163,7 +399,7 @@ def main():
 
     if not os.path.exists(DATA_PATH):
         raise FileNotFoundError(
-            f"Dataset not found at {DATA_PATH}. Please upload telco_customer_churn.csv inside data folder."
+            f"Dataset not found at {DATA_PATH}. Please upload telco_customer_churn.csv inside the data folder."
         )
 
     df = pd.read_csv(DATA_PATH)
@@ -174,22 +410,24 @@ def main():
 
     X = drop_unwanted_columns(df, target_col)
 
-    # Replace blank values
     X = X.replace(" ", pd.NA)
     X = X.replace("", pd.NA)
-
-    # Safe numeric conversion
     X = convert_numeric_columns(X)
 
-    numeric_features = X.select_dtypes(include=["int64", "float64"]).columns.tolist()
-    categorical_features = X.select_dtypes(include=["object", "category", "bool"]).columns.tolist()
+    numeric_features = X.select_dtypes(
+        include=["int64", "float64"]
+    ).columns.tolist()
+
+    categorical_features = X.select_dtypes(
+        include=["object", "category", "bool"]
+    ).columns.tolist()
 
     print("Target column:", target_col)
     print("Rows:", len(df))
     print("Features used:", X.shape[1])
     print("Numeric features:", len(numeric_features))
     print("Categorical features:", len(categorical_features))
-    print("Churn rate:", round(y.mean(), 4))
+    print("Churn rate:", round(float(y.mean()), 4))
 
     numeric_pipeline = Pipeline(steps=[
         ("imputer", SimpleImputer(strategy="median")),
@@ -207,14 +445,16 @@ def main():
     ])
 
     model = RandomForestClassifier(
-        n_estimators=300,
-        random_state=42,
+        n_estimators=450,
+        max_depth=14,
+        min_samples_split=8,
+        min_samples_leaf=3,
         class_weight="balanced",
-        max_depth=12,
+        random_state=42,
         n_jobs=-1
     )
 
-    pipeline = Pipeline(steps=[
+    model_pipeline = Pipeline(steps=[
         ("preprocessor", preprocessor),
         ("model", model)
     ])
@@ -222,15 +462,15 @@ def main():
     X_train, X_test, y_train, y_test = train_test_split(
         X,
         y,
-        test_size=0.2,
+        test_size=0.20,
         random_state=42,
         stratify=y
     )
 
-    pipeline.fit(X_train, y_train)
+    model_pipeline.fit(X_train, y_train)
 
-    y_pred = pipeline.predict(X_test)
-    y_proba = pipeline.predict_proba(X_test)[:, 1]
+    y_pred = model_pipeline.predict(X_test)
+    y_proba = model_pipeline.predict_proba(X_test)[:, 1]
 
     metrics = {
         "rows": int(len(df)),
@@ -243,77 +483,49 @@ def main():
         "f1_score": round(float(f1_score(y_test, y_pred)), 4),
         "roc_auc": round(float(roc_auc_score(y_test, y_proba)), 4),
         "pr_auc": round(float(average_precision_score(y_test, y_proba)), 4),
+        "lift_at_10_percent": round(float(lift_at_k(y_test, y_proba, k=0.10)), 4)
     }
 
-    print("\nModel Metrics:")
+    print("\nIBM Telco Model Metrics:")
     for key, value in metrics.items():
         print(f"{key}: {value}")
 
     with open(f"{OUTPUT_DIR}/telco_metrics.json", "w") as f:
         json.dump(metrics, f, indent=4)
 
-    joblib.dump(pipeline, MODEL_PATH)
+    joblib.dump(model_pipeline, MODEL_PATH)
 
-    # Confusion Matrix
-    ConfusionMatrixDisplay.from_predictions(y_test, y_pred)
-    plt.title("Confusion Matrix - IBM Telco Churn Model")
-    plt.savefig(f"{IMAGE_DIR}/telco_confusion_matrix.png", bbox_inches="tight")
-    plt.close()
-
-    # ROC Curve
-    RocCurveDisplay.from_predictions(y_test, y_proba)
-    plt.title("ROC Curve - IBM Telco Churn Model")
-    plt.savefig(f"{IMAGE_DIR}/telco_roc_curve.png", bbox_inches="tight")
-    plt.close()
-
-    # Precision-Recall Curve
-    PrecisionRecallDisplay.from_predictions(y_test, y_proba)
-    plt.title("Precision-Recall Curve - IBM Telco Churn Model")
-    plt.savefig(f"{IMAGE_DIR}/telco_pr_curve.png", bbox_inches="tight")
-    plt.close()
-
-    # Feature Importance
-    try:
-        feature_names = pipeline.named_steps["preprocessor"].get_feature_names_out()
-        importances = pipeline.named_steps["model"].feature_importances_
-
-        feature_importance = pd.DataFrame({
-            "feature": feature_names,
-            "importance": importances
-        }).sort_values("importance", ascending=False)
-
-        feature_importance.to_csv(f"{OUTPUT_DIR}/telco_feature_importance.csv", index=False)
-
-        top_features = feature_importance.head(15)
-
-        plt.figure(figsize=(10, 6))
-        plt.barh(top_features["feature"], top_features["importance"])
-        plt.gca().invert_yaxis()
-        plt.title("Top Feature Importance - IBM Telco Churn Model")
-        plt.xlabel("Importance")
-        plt.tight_layout()
-        plt.savefig(f"{IMAGE_DIR}/telco_feature_importance.png", bbox_inches="tight")
-        plt.close()
-
-    except Exception as e:
-        print("Feature importance generation skipped:", str(e))
+    # Save premium charts
+    save_confusion_matrix(y_test, y_pred)
+    save_roc_curve(y_test, y_proba)
+    save_pr_curve(y_test, y_proba)
+    save_feature_importance(model_pipeline)
 
     # Churn Watchlist
     scored = X_test.copy()
     scored["actual_churn"] = y_test.values
     scored["churn_probability"] = y_proba
+    scored["risk_segment"] = scored["churn_probability"].apply(assign_risk_segment)
+    scored["recommended_action"] = scored.apply(recommend_retention_action, axis=1)
+    scored["main_reason"] = scored.apply(find_main_reason, axis=1)
 
-    scored["risk_segment"] = pd.cut(
-        scored["churn_probability"],
-        bins=[0, 0.25, 0.50, 1.0],
-        labels=["Low Risk", "Medium Risk", "High Risk"],
-        include_lowest=True
-    )
+    priority_columns = [
+        "churn_probability",
+        "risk_segment",
+        "recommended_action",
+        "main_reason",
+        "actual_churn"
+    ]
 
-    scored["recommended_action"] = scored.apply(add_retention_action, axis=1)
+    remaining_columns = [col for col in scored.columns if col not in priority_columns]
 
+    scored = scored[priority_columns + remaining_columns]
     scored = scored.sort_values("churn_probability", ascending=False)
-    scored.head(50).to_csv(f"{OUTPUT_DIR}/telco_top_50_churn_watchlist.csv", index=False)
+
+    scored.head(50).to_csv(
+        f"{OUTPUT_DIR}/telco_top_50_churn_watchlist.csv",
+        index=False
+    )
 
     print("\nSaved files:")
     print(f"- {MODEL_PATH}")
