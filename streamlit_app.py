@@ -368,7 +368,6 @@ st.markdown(
         color: {TEXT};
     }}
 
-    /* Hide any radio input visuals if Streamlit adds them anywhere */
     div[role="radiogroup"] input {{
         display: none !important;
     }}
@@ -653,7 +652,7 @@ st.markdown(
 
 
 # =========================================================
-# BUTTON NAVIGATION - NO RED RADIO DOTS
+# BUTTON NAVIGATION
 # =========================================================
 if "page" not in st.session_state:
     st.session_state.page = "synthetic"
@@ -716,6 +715,30 @@ if st.session_state.page == "synthetic":
         kpi_card("ROC-AUC", roc_auc)
     with c4:
         kpi_card("Lift@10%", lift)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    train_syn_col, _ = st.columns([1, 4])
+
+    with train_syn_col:
+        retrain_synthetic = st.button("Retrain Synthetic Model")
+
+    if retrain_synthetic:
+        with st.spinner("Retraining synthetic churn model..."):
+            if os.path.exists("src/train_model.py"):
+                out, err, code = run_command(f"{sys.executable} src/train_model.py")
+            elif os.path.exists("train_model.py"):
+                out, err, code = run_command(f"{sys.executable} train_model.py")
+            else:
+                out, err, code = "", "train_model.py not found.", 1
+
+            if code == 0:
+                st.success("Synthetic churn model retrained successfully.")
+                with st.expander("View synthetic training logs"):
+                    st.code(out)
+            else:
+                st.error("Synthetic model training failed.")
+                st.code(err)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
