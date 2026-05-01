@@ -7,22 +7,23 @@ import joblib
 import numpy as np
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
 
 
-# ==========================================================
+# =========================================================
 # PAGE CONFIG
-# ==========================================================
+# =========================================================
 st.set_page_config(
     page_title="Customer Churn Prediction Dashboard",
-    page_icon="📉",
+    page_icon="📊",
     layout="wide"
 )
 
 
-# ==========================================================
-# PATH CONFIG
-# ==========================================================
+# =========================================================
+# PATHS
+# =========================================================
 SYNTHETIC_DATA_PATH = "data/churn_frame.csv"
 TELCO_CSV_PATH = "data/telco_customer_churn.csv"
 TELCO_XLSX_PATH = "Telco_customer_churn.xlsx"
@@ -37,167 +38,315 @@ WATCHLIST_PATH = "outputs/top_50_churn_watchlist.csv"
 TELCO_WATCHLIST_PATH = "outputs/telco_top_50_churn_watchlist.csv"
 
 
-# ==========================================================
-# CUSTOM CSS THEME
-# ==========================================================
+# =========================================================
+# THEME COLORS
+# =========================================================
+PRIMARY = "#0F6E9C"
+PRIMARY_DARK = "#0B5A7C"
+PRIMARY_LIGHT = "#DDF2FB"
+SECONDARY = "#1E88E5"
+ACCENT = "#4FC3F7"
+
+BG = "#F4F7FB"
+CARD = "#FFFFFF"
+TEXT = "#102A43"
+MUTED = "#486581"
+BORDER = "#D9E2EC"
+
+LOW_BG = "#E6F7EC"
+LOW_TEXT = "#166534"
+MED_BG = "#FFF8DB"
+MED_TEXT = "#9A6700"
+HIGH_BG = "#FDECEC"
+HIGH_TEXT = "#B42318"
+
+BLUE_SCALE = [
+    "#DDF2FB",
+    "#B9E3F9",
+    "#8FD0F4",
+    "#64B8EC",
+    "#3B9DDF",
+    "#1F84C7",
+    "#0F6E9C"
+]
+
+PLOT_BLUE = "#1F84C7"
+PLOT_BLUE_LIGHT = "#7EC8F8"
+PLOT_RED = "#EF5350"
+PLOT_GRID = "#EAF1F7"
+
+
+# =========================================================
+# GLOBAL CSS
+# =========================================================
 st.markdown(
-    """
+    f"""
     <style>
-    .stApp {
-        background-color: #f4f9fb;
-        color: #0f172a;
-    }
+    .stApp {{
+        background: {BG};
+        color: {TEXT};
+        font-family: "Segoe UI", sans-serif;
+    }}
 
-    section[data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #075985 0%, #0e7490 100%);
-    }
+    [data-testid="stAppViewContainer"] {{
+        background: {BG};
+    }}
 
-    section[data-testid="stSidebar"] * {
+    [data-testid="stHeader"] {{
+        background: rgba(0,0,0,0);
+    }}
+
+    section[data-testid="stSidebar"] {{
+        background: linear-gradient(180deg, {PRIMARY_DARK} 0%, {PRIMARY} 100%);
+        color: white;
+        border-right: 1px solid rgba(255,255,255,0.08);
+    }}
+
+    section[data-testid="stSidebar"] * {{
         color: white !important;
-    }
+    }}
 
-    .main-title {
-        background: linear-gradient(90deg, #075985, #0e7490);
-        padding: 22px 28px;
-        border-radius: 18px;
+    .block-container {{
+        padding-top: 1.4rem;
+        padding-bottom: 2rem;
+        max-width: 1500px;
+    }}
+
+    .hero {{
+        background: linear-gradient(90deg, {PRIMARY_DARK}, {PRIMARY});
+        border-radius: 24px;
+        padding: 26px 32px;
         color: white;
-        text-align: center;
-        margin-bottom: 20px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.15);
-    }
-
-    .main-title h1 {
-        font-size: 38px;
-        margin-bottom: 4px;
-        font-weight: 800;
-    }
-
-    .main-title p {
-        font-size: 15px;
-        margin: 0;
-        color: #dbeafe;
-    }
-
-    .kpi-card {
-        background: linear-gradient(180deg, #0e7490, #075985);
-        padding: 18px;
-        border-radius: 16px;
-        text-align: center;
-        color: white;
-        box-shadow: 0 4px 14px rgba(0,0,0,0.12);
-        border: 1px solid #bae6fd;
-        min-height: 115px;
-    }
-
-    .kpi-card h4 {
-        font-size: 13px;
-        margin-bottom: 10px;
-        color: #e0f2fe;
-    }
-
-    .kpi-card h2 {
-        font-size: 28px;
-        margin: 0;
-        font-weight: 800;
-        color: white;
-    }
-
-    .chart-card {
-        background: white;
-        border-radius: 16px;
-        padding: 18px;
-        box-shadow: 0 4px 14px rgba(0,0,0,0.08);
-        border: 1px solid #dbeafe;
+        box-shadow: 0 10px 30px rgba(15,110,156,0.18);
         margin-bottom: 18px;
-    }
+    }}
 
-    .chart-title {
-        font-size: 18px;
+    .hero-title {{
+        font-size: 2.2rem;
         font-weight: 800;
-        color: #075985;
-        margin-bottom: 10px;
-    }
-
-    .insight-box {
-        background: #ecfeff;
-        border-left: 6px solid #0891b2;
-        padding: 16px;
-        border-radius: 12px;
-        margin-bottom: 12px;
-        color: #0f172a;
-        font-size: 15px;
-    }
-
-    .risk-low {
-        background: #dcfce7;
-        color: #166534;
-        padding: 18px;
-        border-radius: 16px;
+        margin: 0;
         text-align: center;
-        font-weight: 800;
-        border: 1px solid #86efac;
-    }
+    }}
 
-    .risk-medium {
-        background: #fef9c3;
-        color: #854d0e;
-        padding: 18px;
-        border-radius: 16px;
+    .hero-sub {{
+        font-size: 1rem;
+        opacity: 0.95;
+        margin-top: 8px;
         text-align: center;
-        font-weight: 800;
-        border: 1px solid #fde047;
-    }
+    }}
 
-    .risk-high {
-        background: #fee2e2;
-        color: #991b1b;
+    .nav-wrap {{
+        margin: 6px 0 18px 0;
+    }}
+
+    div[data-baseweb="radio"] > div {{
+        gap: 12px !important;
+    }}
+
+    div[role="radiogroup"] label {{
+        background: white !important;
+        border: 1px solid {BORDER} !important;
+        border-radius: 12px !important;
+        padding: 10px 16px !important;
+        color: {TEXT} !important;
+        font-weight: 600 !important;
+        box-shadow: 0 3px 10px rgba(16,42,67,0.05);
+    }}
+
+    div[role="radiogroup"] label:has(input:checked) {{
+        background: linear-gradient(90deg, {PRIMARY_DARK}, {PRIMARY}) !important;
+        color: white !important;
+        border: none !important;
+    }}
+
+    .section-title {{
+        font-size: 1.85rem;
+        font-weight: 800;
+        color: {TEXT};
+        margin-top: 4px;
+        margin-bottom: 14px;
+    }}
+
+    .card {{
+        background: {CARD};
+        border: 1px solid {BORDER};
+        border-radius: 20px;
+        box-shadow: 0 8px 24px rgba(16,42,67,0.06);
         padding: 18px;
-        border-radius: 16px;
+    }}
+
+    .kpi-card {{
+        background: linear-gradient(180deg, {PRIMARY}, {PRIMARY_DARK});
+        color: white;
+        border-radius: 20px;
+        padding: 18px;
         text-align: center;
-        font-weight: 800;
-        border: 1px solid #fca5a5;
-    }
+        box-shadow: 0 10px 22px rgba(15,110,156,0.18);
+        min-height: 120px;
+        border: none;
+    }}
 
-    div[data-testid="stMetricValue"] {
-        color: #075985;
-        font-weight: 800;
-    }
-
-    div[data-testid="stDataFrame"] {
-        border-radius: 14px;
-    }
-
-    .footer-note {
-        background: #e0f2fe;
-        padding: 14px;
-        border-radius: 14px;
-        color: #075985;
+    .kpi-label {{
+        font-size: 0.9rem;
+        opacity: 0.95;
         font-weight: 600;
+        margin-bottom: 12px;
+    }}
+
+    .kpi-value {{
+        font-size: 2rem;
+        font-weight: 800;
+        line-height: 1.2;
+    }}
+
+    .risk-card {{
+        border-radius: 20px;
+        padding: 18px;
         text-align: center;
-        margin-top: 20px;
-    }
+        border: 1px solid {BORDER};
+        box-shadow: 0 8px 24px rgba(16,42,67,0.05);
+        min-height: 112px;
+    }}
+
+    .risk-title {{
+        font-weight: 800;
+        font-size: 1rem;
+        margin-bottom: 10px;
+    }}
+
+    .risk-value {{
+        font-weight: 800;
+        font-size: 2rem;
+    }}
+
+    .chart-shell {{
+        background: {CARD};
+        border-radius: 20px;
+        border: 1px solid {BORDER};
+        box-shadow: 0 8px 24px rgba(16,42,67,0.06);
+        padding: 14px 14px 4px 14px;
+        margin-bottom: 16px;
+    }}
+
+    .chart-title {{
+        font-size: 1.1rem;
+        font-weight: 800;
+        color: {PRIMARY_DARK};
+        margin-bottom: 10px;
+    }}
+
+    .insight-card {{
+        background: {CARD};
+        border: 1px solid {BORDER};
+        border-radius: 20px;
+        box-shadow: 0 8px 24px rgba(16,42,67,0.06);
+        padding: 16px;
+        height: 100%;
+    }}
+
+    .insight-box {{
+        background: #EEF7FB;
+        border-left: 5px solid {PRIMARY};
+        border-radius: 14px;
+        padding: 14px 14px;
+        margin-bottom: 10px;
+        color: {TEXT};
+        font-size: 0.95rem;
+        line-height: 1.5;
+    }}
+
+    .small-note {{
+        color: {MUTED};
+        font-size: 0.92rem;
+        margin-top: 4px;
+    }}
+
+    .subtle-title {{
+        font-size: 1.55rem;
+        font-weight: 800;
+        color: {TEXT};
+        margin: 18px 0 10px 0;
+    }}
+
+    .footer-note {{
+        background: white;
+        border: 1px solid {BORDER};
+        border-radius: 18px;
+        padding: 14px;
+        text-align: center;
+        color: {PRIMARY_DARK};
+        font-weight: 600;
+        margin-top: 18px;
+    }}
+
+    .stDataFrame {{
+        background: white !important;
+        border-radius: 18px !important;
+        border: 1px solid {BORDER} !important;
+        box-shadow: 0 8px 24px rgba(16,42,67,0.06);
+    }}
+
+    .stButton > button {{
+        background: linear-gradient(90deg, {PRIMARY_DARK}, {PRIMARY});
+        color: white;
+        border: none;
+        border-radius: 12px;
+        font-weight: 700;
+        padding: 0.55rem 1rem;
+        box-shadow: 0 6px 16px rgba(15,110,156,0.18);
+    }}
+
+    .stButton > button:hover {{
+        background: linear-gradient(90deg, {PRIMARY}, {SECONDARY});
+        color: white;
+        border: none;
+    }}
+
+    .stSelectbox label,
+    .stNumberInput label,
+    .stSlider label,
+    .stTextInput label,
+    .stMultiSelect label {{
+        color: {TEXT} !important;
+        font-weight: 700 !important;
+    }}
+
+    .stMarkdown, p, label, div {{
+        color: {TEXT};
+    }}
+
+    h1, h2, h3, h4, h5 {{
+        color: {TEXT};
+    }}
+
+    .stAlert {{
+        border-radius: 14px;
+    }}
+
+    .sidebar-card {{
+        background: rgba(255,255,255,0.10);
+        border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 16px;
+        padding: 14px;
+        margin-bottom: 14px;
+    }}
     </style>
     """,
     unsafe_allow_html=True
 )
 
 
-# ==========================================================
-# HELPER FUNCTIONS
-# ==========================================================
-def run_command(command):
-    result = subprocess.run(
-        command,
-        shell=True,
-        capture_output=True,
-        text=True
-    )
-    return result.stdout, result.stderr, result.returncode
-
-
+# =========================================================
+# HELPERS
+# =========================================================
 def ensure_folders():
     for folder in ["data", "models", "outputs", "images", "src"]:
         os.makedirs(folder, exist_ok=True)
+
+
+def run_command(command):
+    result = subprocess.run(command, shell=True, capture_output=True, text=True)
+    return result.stdout, result.stderr, result.returncode
 
 
 def read_json(path):
@@ -205,6 +354,52 @@ def read_json(path):
         with open(path, "r") as f:
             return json.load(f)
     return {}
+
+
+def kpi_card(title, value):
+    st.markdown(
+        f"""
+        <div class="kpi-card">
+            <div class="kpi-label">{title}</div>
+            <div class="kpi-value">{value}</div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+
+def risk_card(title, value, bg, color):
+    st.markdown(
+        f"""
+        <div class="risk-card" style="background:{bg}; color:{color};">
+            <div class="risk-title">{title}</div>
+            <div class="risk-value">{value}</div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+
+def section_title(text):
+    st.markdown(f'<div class="section-title">{text}</div>', unsafe_allow_html=True)
+
+
+def subtle_title(text):
+    st.markdown(f'<div class="subtle-title">{text}</div>', unsafe_allow_html=True)
+
+
+def chart_container_start(title):
+    st.markdown(
+        f"""
+        <div class="chart-shell">
+        <div class="chart-title">{title}</div>
+        """,
+        unsafe_allow_html=True
+    )
+
+
+def chart_container_end():
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def clean_col_name(col):
@@ -224,18 +419,38 @@ def clean_dataframe_columns(df):
     return df
 
 
+def find_column(df, possible_names):
+    cols = list(df.columns)
+    for name in possible_names:
+        clean_name = clean_col_name(name)
+        if clean_name in cols:
+            return clean_name
+    return None
+
+
+def detect_churn_column(df):
+    possible = ["churn", "churn_label", "customer_status", "churn_value"]
+    return find_column(df, possible)
+
+
+def create_churn_binary(df, churn_col):
+    values = df[churn_col].astype(str).str.lower().str.strip()
+    if churn_col == "customer_status":
+        return values.apply(lambda x: 1 if "churn" in x else 0)
+    return values.apply(lambda x: 1 if x in ["yes", "1", "true", "churned"] else 0)
+
+
 def convert_telco_excel_to_csv_if_needed():
     if os.path.exists(TELCO_CSV_PATH):
         return True
 
     if os.path.exists(TELCO_XLSX_PATH):
         try:
-            ensure_folders()
             telco_df = pd.read_excel(TELCO_XLSX_PATH)
             telco_df.to_csv(TELCO_CSV_PATH, index=False)
             return True
         except Exception as e:
-            st.error("Found Excel file, but could not convert it to CSV.")
+            st.error("Found Excel file, but conversion to CSV failed.")
             st.code(str(e))
             return False
 
@@ -246,15 +461,15 @@ def ensure_synthetic_ready():
     ensure_folders()
 
     if not os.path.exists(SYNTHETIC_DATA_PATH):
-        if os.path.exists("generate_data.py"):
-            out, err, code = run_command(f"{sys.executable} generate_data.py --rows 5000")
-        elif os.path.exists("src/generate_data.py"):
+        if os.path.exists("src/generate_data.py"):
             out, err, code = run_command(f"{sys.executable} src/generate_data.py --rows 5000")
+        elif os.path.exists("generate_data.py"):
+            out, err, code = run_command(f"{sys.executable} generate_data.py --rows 5000")
         else:
             return False
 
         if code != 0:
-            st.error("Failed to generate synthetic data.")
+            st.error("Synthetic data generation failed.")
             st.code(err)
             return False
 
@@ -262,18 +477,48 @@ def ensure_synthetic_ready():
             pd.read_csv("churn_frame.csv").to_csv(SYNTHETIC_DATA_PATH, index=False)
 
     if not os.path.exists(SYNTHETIC_MODEL_PATH):
-        if os.path.exists("train_model.py"):
-            out, err, code = run_command(f"{sys.executable} train_model.py")
-        elif os.path.exists("src/train_model.py"):
+        if os.path.exists("src/train_model.py"):
             out, err, code = run_command(f"{sys.executable} src/train_model.py")
+        elif os.path.exists("train_model.py"):
+            out, err, code = run_command(f"{sys.executable} train_model.py")
         else:
             return os.path.exists(SYNTHETIC_DATA_PATH)
 
-        if code != 0:
-            st.warning("Model training failed, but dashboard data is available.")
-            st.code(err)
-
     return os.path.exists(SYNTHETIC_DATA_PATH)
+
+
+def powerbi_layout(fig, title=None):
+    fig.update_layout(
+        template="plotly_white",
+        paper_bgcolor="white",
+        plot_bgcolor="white",
+        font=dict(color=TEXT, family="Segoe UI"),
+        title_font=dict(color=TEXT, size=18),
+        margin=dict(l=20, r=20, t=20 if title is None else 50, b=20),
+        legend=dict(
+            bgcolor="rgba(0,0,0,0)",
+            font=dict(color=TEXT)
+        ),
+        xaxis=dict(
+            showgrid=True,
+            gridcolor=PLOT_GRID,
+            zeroline=False,
+            linecolor=BORDER,
+            tickfont=dict(color=MUTED),
+            title_font=dict(color=TEXT)
+        ),
+        yaxis=dict(
+            showgrid=True,
+            gridcolor=PLOT_GRID,
+            zeroline=False,
+            linecolor=BORDER,
+            tickfont=dict(color=MUTED),
+            title_font=dict(color=TEXT)
+        )
+    )
+    if title:
+        fig.update_layout(title=title)
+    return fig
 
 
 def risk_action(prob):
@@ -285,124 +530,71 @@ def risk_action(prob):
         return "Low Risk", "Regular engagement email"
 
 
-def kpi_card(title, value):
-    st.markdown(
-        f"""
-        <div class="kpi-card">
-            <h4>{title}</h4>
-            <h2>{value}</h2>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-
-def chart_card_start(title):
-    st.markdown(
-        f"""
-        <div class="chart-card">
-        <div class="chart-title">{title}</div>
-        """,
-        unsafe_allow_html=True
-    )
-
-
-def chart_card_end():
-    st.markdown("</div>", unsafe_allow_html=True)
-
-
-def find_column(df, possible_names):
-    cols = list(df.columns)
-    for name in possible_names:
-        clean_name = clean_col_name(name)
-        if clean_name in cols:
-            return clean_name
-    return None
-
-
-def detect_churn_column(df):
-    possible_cols = [
-        "churn",
-        "churn_label",
-        "customer_status",
-        "churn_value"
-    ]
-    return find_column(df, possible_cols)
-
-
-def create_churn_binary(df, churn_col):
-    values = df[churn_col].astype(str).str.lower().str.strip()
-
-    if churn_col == "customer_status":
-        return values.apply(lambda x: 1 if "churn" in x else 0)
-
-    return values.apply(
-        lambda x: 1 if x in ["yes", "1", "true", "churned"] else 0
-    )
-
-
-# ==========================================================
+# =========================================================
 # HEADER
-# ==========================================================
+# =========================================================
 st.markdown(
     """
-    <div class="main-title">
-        <h1>📉 Customer Churn Prediction Dashboard</h1>
-        <p>Industry-style customer churn analytics, risk segmentation, retention actions, and ML model monitoring</p>
+    <div class="hero">
+        <div class="hero-title">📉 Customer Churn Prediction Dashboard</div>
+        <div class="hero-sub">Industry-style customer churn analytics, risk segmentation, retention actions, and ML model monitoring</div>
     </div>
     """,
     unsafe_allow_html=True
 )
 
 
-# ==========================================================
+# =========================================================
 # SIDEBAR
-# ==========================================================
+# =========================================================
 with st.sidebar:
-    st.title("📊 Dashboard Controls")
+    st.markdown("## 📊 Dashboard Controls")
     st.markdown("---")
-    st.subheader("Project Summary")
-    st.write(
-        """
-        This dashboard predicts customer churn, identifies high-risk customers, 
-        explains churn drivers, and suggests retention actions.
-        """
-    )
 
-    st.markdown("---")
-    st.subheader("Dashboard Sections")
+    st.markdown('<div class="sidebar-card">', unsafe_allow_html=True)
+    st.markdown("### Project Summary")
+    st.write(
+        "This dashboard predicts customer churn, identifies high-risk customers, explains churn drivers, and suggests retention actions."
+    )
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown('<div class="sidebar-card">', unsafe_allow_html=True)
+    st.markdown("### Dashboard Sections")
     st.write("✅ Synthetic churn simulation")
     st.write("✅ IBM Telco dataset analysis")
     st.write("✅ Single customer prediction")
     st.write("✅ Risk segmentation")
     st.write("✅ Retention actions")
+    st.markdown("</div>", unsafe_allow_html=True)
 
-    st.markdown("---")
-    st.subheader("Dataset Note")
-    st.info(
-        "IBM Telco dataset is a public dataset used for educational and portfolio purposes."
-    )
+    st.markdown('<div class="sidebar-card">', unsafe_allow_html=True)
+    st.markdown("### Dataset Note")
+    st.info("IBM Telco dataset is a public dataset used for educational and portfolio purposes.")
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
-tab1, tab2, tab3 = st.tabs(
-    [
-        "📊 Synthetic Churn Dashboard",
-        "🏢 IBM Telco Dataset",
-        "🎯 Single Customer Prediction"
-    ]
+# =========================================================
+# NAVIGATION
+# =========================================================
+st.markdown('<div class="nav-wrap">', unsafe_allow_html=True)
+page = st.radio(
+    "Navigation",
+    ["📊 Synthetic Churn Dashboard", "🏢 IBM Telco Dataset", "🎯 Single Customer Prediction"],
+    horizontal=True,
+    label_visibility="collapsed"
 )
+st.markdown('</div>', unsafe_allow_html=True)
 
 
-# ==========================================================
-# TAB 1: SYNTHETIC DASHBOARD
-# ==========================================================
-with tab1:
-    st.subheader("Synthetic Customer Churn Dashboard")
+# =========================================================
+# PAGE 1: SYNTHETIC DASHBOARD
+# =========================================================
+if page == "📊 Synthetic Churn Dashboard":
+    section_title("Synthetic Customer Churn Dashboard")
 
     ready = ensure_synthetic_ready()
-
     if not ready:
-        st.error("Synthetic dataset is not available. Please upload or generate data/churn_frame.csv.")
+        st.error("Synthetic dataset is not available.")
         st.stop()
 
     df = pd.read_csv(SYNTHETIC_DATA_PATH)
@@ -413,14 +605,14 @@ with tab1:
     roc_auc = metrics.get("roc_auc", "NA")
     lift = metrics.get("lift_at_10_percent", "NA")
 
-    k1, k2, k3, k4 = st.columns(4)
-    with k1:
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
         kpi_card("Total Customers", f"{total_customers:,}")
-    with k2:
+    with c2:
         kpi_card("Churn Rate", f"{churn_rate:.1f}%")
-    with k3:
+    with c3:
         kpi_card("ROC-AUC", roc_auc)
-    with k4:
+    with c4:
         kpi_card("Lift@10%", lift)
 
     st.markdown("<br>", unsafe_allow_html=True)
@@ -431,57 +623,65 @@ with tab1:
 
     r1, r2, r3 = st.columns(3)
     with r1:
-        st.markdown(f"<div class='risk-low'>Low Risk<br><h2>{low_risk:,}</h2></div>", unsafe_allow_html=True)
+        risk_card("Low Risk", f"{low_risk:,}", LOW_BG, LOW_TEXT)
     with r2:
-        st.markdown(f"<div class='risk-medium'>Medium Risk<br><h2>{medium_risk:,}</h2></div>", unsafe_allow_html=True)
+        risk_card("Medium Risk", f"{medium_risk:,}", MED_BG, MED_TEXT)
     with r3:
-        st.markdown(f"<div class='risk-high'>High Risk<br><h2>{high_risk:,}</h2></div>", unsafe_allow_html=True)
+        risk_card("High Risk", f"{high_risk:,}", HIGH_BG, HIGH_TEXT)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    c1, c2 = st.columns(2)
+    row1_a, row1_b = st.columns(2)
 
-    with c1:
-        chart_card_start("Churn Distribution")
+    with row1_a:
+        chart_container_start("Churn Distribution")
         churn_counts = df["churned_next_cycle"].value_counts().reset_index()
         churn_counts.columns = ["Churn", "Count"]
         churn_counts["Churn"] = churn_counts["Churn"].map({0: "No Churn", 1: "Churn"})
         fig = px.pie(
             churn_counts,
-            names="Churn",
             values="Count",
+            names="Churn",
             hole=0.45,
-            color_discrete_sequence=["#38bdf8", "#ef4444"]
+            color="Churn",
+            color_discrete_map={"No Churn": PLOT_BLUE, "Churn": PLOT_RED}
         )
+        fig = powerbi_layout(fig)
         st.plotly_chart(fig, use_container_width=True)
-        chart_card_end()
+        chart_container_end()
 
-    with c2:
-        chart_card_start("Tenure vs Churn")
+    with row1_b:
+        chart_container_start("Tenure vs Churn")
         fig = px.histogram(
             df,
             x="tenure_months",
             color="churned_next_cycle",
-            color_discrete_sequence=["#38bdf8", "#ef4444"]
+            barmode="overlay",
+            color_discrete_map={0: PLOT_BLUE, 1: PLOT_RED},
+            opacity=0.85
         )
+        fig = powerbi_layout(fig)
         st.plotly_chart(fig, use_container_width=True)
-        chart_card_end()
+        chart_container_end()
 
-    c3, c4 = st.columns(2)
+    row2_a, row2_b = st.columns(2)
 
-    with c3:
-        chart_card_start("Monthly Usage Hours vs Churn")
+    with row2_a:
+        chart_container_start("Monthly Usage Hours vs Churn")
         fig = px.histogram(
             df,
             x="monthly_usage_hours",
             color="churned_next_cycle",
-            color_discrete_sequence=["#38bdf8", "#ef4444"]
+            barmode="overlay",
+            color_discrete_map={0: PLOT_BLUE, 1: PLOT_RED},
+            opacity=0.85
         )
+        fig = powerbi_layout(fig)
         st.plotly_chart(fig, use_container_width=True)
-        chart_card_end()
+        chart_container_end()
 
-    with c4:
-        chart_card_start("Support Tickets vs Churn")
+    with row2_b:
+        chart_container_start("Support Tickets vs Churn")
         if "support_tickets" in df.columns:
             support_churn = df.groupby("support_tickets")["churned_next_cycle"].mean().reset_index()
             support_churn["churn_rate"] = support_churn["churned_next_cycle"] * 100
@@ -489,132 +689,121 @@ with tab1:
                 support_churn,
                 x="support_tickets",
                 y="churn_rate",
-                color_discrete_sequence=["#0e7490"]
+                color_discrete_sequence=[PLOT_BLUE]
             )
+            fig = powerbi_layout(fig)
             st.plotly_chart(fig, use_container_width=True)
-        chart_card_end()
+        else:
+            st.info("Support ticket data not available.")
+        chart_container_end()
 
-    st.subheader("Top 50 Churn Watchlist")
-
+    subtle_title("Top 50 Churn Watchlist")
     if os.path.exists(WATCHLIST_PATH):
         st.dataframe(pd.read_csv(WATCHLIST_PATH), use_container_width=True)
     else:
-        st.info("Watchlist not found yet. Train the model first.")
+        st.info("Watchlist file not found.")
 
-    st.subheader("Model Performance Charts")
+    subtle_title("Model Performance Charts")
+    img1, img2, img3, img4 = st.columns(4)
 
     chart_files = [
         ("images/confusion_matrix.png", "Confusion Matrix"),
         ("images/roc_curve.png", "ROC Curve"),
         ("images/pr_curve.png", "Precision-Recall Curve"),
-        ("images/feature_importance.png", "Feature Importance")
+        ("images/feature_importance.png", "Feature Importance"),
     ]
 
-    cols = st.columns(4)
-
-    for col, (img, title) in zip(cols, chart_files):
+    for col, (img, title) in zip([img1, img2, img3, img4], chart_files):
         with col:
-            chart_card_start(title)
+            chart_container_start(title)
             if os.path.exists(img):
                 st.image(img, use_container_width=True)
             else:
                 st.info("Not available")
-            chart_card_end()
+            chart_container_end()
 
-    st.subheader("Business Insights")
+    subtle_title("Business Insights")
     st.markdown(
-        """
-        <div class="insight-box">
-        <b>Insight 1:</b> Customers with lower engagement and shorter tenure show higher churn tendency.
-        </div>
-        <div class="insight-box">
-        <b>Insight 2:</b> Customers with payment delay and higher support issues should be prioritized for retention campaigns.
-        </div>
-        <div class="insight-box">
-        <b>Insight 3:</b> Lift@10% shows the model is useful for targeting the highest-risk customer group first.
+        f"""
+        <div class="insight-card">
+            <div class="insight-box"><b>Insight 1:</b> Lower engagement and shorter tenure customers show higher churn tendency.</div>
+            <div class="insight-box"><b>Insight 2:</b> Customers with payment delay and more support issues should be prioritized for retention.</div>
+            <div class="insight-box"><b>Insight 3:</b> Lift@10% indicates the model can help target the most at-risk customer group effectively.</div>
         </div>
         """,
         unsafe_allow_html=True
     )
 
 
-# ==========================================================
-# TAB 2: IBM TELCO DASHBOARD
-# ==========================================================
-with tab2:
-    st.subheader("IBM Telco Customer Churn Analysis Dashboard")
+# =========================================================
+# PAGE 2: IBM TELCO
+# =========================================================
+elif page == "🏢 IBM Telco Dataset":
+    section_title("IBM Telco Customer Churn Analysis Dashboard")
 
     telco_ready = convert_telco_excel_to_csv_if_needed()
-
     if not telco_ready:
-        st.warning(
-            "IBM Telco dataset not found. Upload it as data/telco_customer_churn.csv "
-            "or Telco_customer_churn.xlsx."
-        )
+        st.warning("IBM Telco dataset not found. Upload data/telco_customer_churn.csv or Telco_customer_churn.xlsx")
         st.stop()
 
     telco_raw = pd.read_csv(TELCO_CSV_PATH)
     telco = clean_dataframe_columns(telco_raw)
 
     churn_col = detect_churn_column(telco)
-
     if churn_col is None:
-        st.error("Could not detect churn column. Expected Churn, Churn Label, Customer Status, or Churn Value.")
-        st.dataframe(telco.head())
+        st.error("Churn column not detected.")
+        st.dataframe(telco.head(), use_container_width=True)
         st.stop()
 
     telco["churn_binary"] = create_churn_binary(telco, churn_col)
 
-    # Sidebar filters for IBM tab
+    gender_col = find_column(telco, ["gender"])
+    contract_col = find_column(telco, ["contract"])
+    internet_col = find_column(telco, ["internet_service"])
+    payment_col = find_column(telco, ["payment_method"])
+    tenure_col = find_column(telco, ["tenure_months", "tenure"])
+    monthly_col = find_column(telco, ["monthly_charge", "monthly_charges"])
+    satisfaction_col = find_column(telco, ["satisfaction_score"])
+
     with st.sidebar:
-        st.markdown("---")
-        st.subheader("IBM Telco Filters")
+        with st.expander("IBM Telco Filters", expanded=True):
+            selected_gender = "All"
+            selected_contract = "All"
+            selected_internet = "All"
+            selected_payment = "All"
 
-        gender_col = find_column(telco, ["gender"])
-        contract_col = find_column(telco, ["contract"])
-        internet_col = find_column(telco, ["internet_service"])
-        payment_col = find_column(telco, ["payment_method"])
-
-        selected_gender = "All"
-        selected_contract = "All"
-        selected_internet = "All"
-        selected_payment = "All"
-
-        if gender_col:
-            selected_gender = st.selectbox(
-                "Gender",
-                ["All"] + sorted(telco[gender_col].dropna().astype(str).unique().tolist())
-            )
-
-        if contract_col:
-            selected_contract = st.selectbox(
-                "Contract Type",
-                ["All"] + sorted(telco[contract_col].dropna().astype(str).unique().tolist())
-            )
-
-        if internet_col:
-            selected_internet = st.selectbox(
-                "Internet Service",
-                ["All"] + sorted(telco[internet_col].dropna().astype(str).unique().tolist())
-            )
-
-        if payment_col:
-            selected_payment = st.selectbox(
-                "Payment Method",
-                ["All"] + sorted(telco[payment_col].dropna().astype(str).unique().tolist())
-            )
+            if gender_col:
+                selected_gender = st.selectbox(
+                    "Gender",
+                    ["All"] + sorted(telco[gender_col].dropna().astype(str).unique().tolist()),
+                    key="gender_filter"
+                )
+            if contract_col:
+                selected_contract = st.selectbox(
+                    "Contract Type",
+                    ["All"] + sorted(telco[contract_col].dropna().astype(str).unique().tolist()),
+                    key="contract_filter"
+                )
+            if internet_col:
+                selected_internet = st.selectbox(
+                    "Internet Service",
+                    ["All"] + sorted(telco[internet_col].dropna().astype(str).unique().tolist()),
+                    key="internet_filter"
+                )
+            if payment_col:
+                selected_payment = st.selectbox(
+                    "Payment Method",
+                    ["All"] + sorted(telco[payment_col].dropna().astype(str).unique().tolist()),
+                    key="payment_filter"
+                )
 
     filtered = telco.copy()
-
     if gender_col and selected_gender != "All":
         filtered = filtered[filtered[gender_col].astype(str) == selected_gender]
-
     if contract_col and selected_contract != "All":
         filtered = filtered[filtered[contract_col].astype(str) == selected_contract]
-
     if internet_col and selected_internet != "All":
         filtered = filtered[filtered[internet_col].astype(str) == selected_internet]
-
     if payment_col and selected_payment != "All":
         filtered = filtered[filtered[payment_col].astype(str) == selected_payment]
 
@@ -622,19 +811,10 @@ with tab2:
     churn_customers = int(filtered["churn_binary"].sum())
     retained_customers = total_rows - churn_customers
     churn_rate = filtered["churn_binary"].mean() * 100 if total_rows > 0 else 0
-
-    age_col = find_column(filtered, ["age"])
-    tenure_col = find_column(filtered, ["tenure_months", "tenure"])
-    satisfaction_col = find_column(filtered, ["satisfaction_score"])
-    monthly_col = find_column(filtered, ["monthly_charge", "monthly_charges", "monthly_charge_amount"])
-    total_charges_col = find_column(filtered, ["total_charges", "total_charge"])
-
-    avg_age = filtered[age_col].mean() if age_col else None
     avg_tenure = filtered[tenure_col].mean() if tenure_col else None
     avg_satisfaction = filtered[satisfaction_col].mean() if satisfaction_col else None
 
     k1, k2, k3, k4, k5, k6 = st.columns(6)
-
     with k1:
         kpi_card("Total Customers", f"{total_rows:,}")
     with k2:
@@ -650,41 +830,41 @@ with tab2:
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # Risk cards
     low = int(total_rows * 0.55)
     medium = int(total_rows * 0.25)
     high = total_rows - low - medium
 
-    r1, r2, r3 = st.columns(3)
-    with r1:
-        st.markdown(f"<div class='risk-low'>Low Risk Customers<br><h2>{low:,}</h2></div>", unsafe_allow_html=True)
-    with r2:
-        st.markdown(f"<div class='risk-medium'>Medium Risk Customers<br><h2>{medium:,}</h2></div>", unsafe_allow_html=True)
-    with r3:
-        st.markdown(f"<div class='risk-high'>High Risk Customers<br><h2>{high:,}</h2></div>", unsafe_allow_html=True)
+    rr1, rr2, rr3 = st.columns(3)
+    with rr1:
+        risk_card("Low Risk Customers", f"{low:,}", LOW_BG, LOW_TEXT)
+    with rr2:
+        risk_card("Medium Risk Customers", f"{medium:,}", MED_BG, MED_TEXT)
+    with rr3:
+        risk_card("High Risk Customers", f"{high:,}", HIGH_BG, HIGH_TEXT)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # Main visual grid
-    left, middle, right = st.columns([1.2, 1.2, 0.9])
+    top_a, top_b, top_c = st.columns([1.1, 1.1, 0.8])
 
-    with left:
-        chart_card_start("Churn vs Non-Churn")
-        churn_counts = filtered["churn_binary"].value_counts().reset_index()
-        churn_counts.columns = ["Churn", "Count"]
-        churn_counts["Churn"] = churn_counts["Churn"].map({0: "Retained", 1: "Churned"})
+    with top_a:
+        chart_container_start("Churn vs Non-Churn")
+        chart_df = filtered["churn_binary"].value_counts().reset_index()
+        chart_df.columns = ["Churn", "Count"]
+        chart_df["Churn"] = chart_df["Churn"].map({0: "Retained", 1: "Churned"})
         fig = px.pie(
-            churn_counts,
+            chart_df,
             names="Churn",
             values="Count",
             hole=0.45,
-            color_discrete_sequence=["#38bdf8", "#ef4444"]
+            color="Churn",
+            color_discrete_map={"Retained": PLOT_BLUE, "Churned": PLOT_RED}
         )
+        fig = powerbi_layout(fig)
         st.plotly_chart(fig, use_container_width=True)
-        chart_card_end()
+        chart_container_end()
 
-    with middle:
-        chart_card_start("Churn by Contract Type")
+    with top_b:
+        chart_container_start("Churn by Contract Type")
         if contract_col:
             chart_df = filtered.groupby(contract_col)["churn_binary"].mean().reset_index()
             chart_df["churn_rate"] = chart_df["churn_binary"] * 100
@@ -693,30 +873,31 @@ with tab2:
                 x=contract_col,
                 y="churn_rate",
                 color="churn_rate",
-                color_continuous_scale="Blues"
+                color_continuous_scale=BLUE_SCALE
             )
+            fig = powerbi_layout(fig)
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("Contract column not found.")
-        chart_card_end()
+        chart_container_end()
 
-    with right:
+    with top_c:
         st.markdown(
-            """
-            <div class="chart-card">
-            <div class="chart-title">Key Insights</div>
-            <div class="insight-box"><b>Churn Rate:</b> Month-to-month contract customers usually show higher churn risk.</div>
-            <div class="insight-box"><b>Retention:</b> Longer tenure customers are generally more stable.</div>
-            <div class="insight-box"><b>Action:</b> High-risk customers should receive targeted support or plan offers.</div>
+            f"""
+            <div class="insight-card">
+                <div class="chart-title">Key Insights</div>
+                <div class="insight-box"><b>Churn Rate:</b> Month-to-month contract customers usually show higher churn risk.</div>
+                <div class="insight-box"><b>Retention:</b> Longer tenure customers are generally more stable.</div>
+                <div class="insight-box"><b>Action:</b> High-risk customers should receive targeted support or plan offers.</div>
             </div>
             """,
             unsafe_allow_html=True
         )
 
-    row2_col1, row2_col2 = st.columns(2)
+    mid1, mid2 = st.columns(2)
 
-    with row2_col1:
-        chart_card_start("Churn by Internet Service")
+    with mid1:
+        chart_container_start("Churn by Internet Service")
         if internet_col:
             chart_df = filtered.groupby(internet_col)["churn_binary"].mean().reset_index()
             chart_df["churn_rate"] = chart_df["churn_binary"] * 100
@@ -725,15 +906,16 @@ with tab2:
                 x=internet_col,
                 y="churn_rate",
                 color="churn_rate",
-                color_continuous_scale="Teal"
+                color_continuous_scale=BLUE_SCALE
             )
+            fig = powerbi_layout(fig)
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("Internet service column not found.")
-        chart_card_end()
+        chart_container_end()
 
-    with row2_col2:
-        chart_card_start("Churn by Payment Method")
+    with mid2:
+        chart_container_start("Churn by Payment Method")
         if payment_col:
             chart_df = filtered.groupby(payment_col)["churn_binary"].mean().reset_index()
             chart_df["churn_rate"] = chart_df["churn_binary"] * 100
@@ -742,55 +924,68 @@ with tab2:
                 x=payment_col,
                 y="churn_rate",
                 color="churn_rate",
-                color_continuous_scale="Blues"
+                color_continuous_scale=BLUE_SCALE
             )
-            fig.update_layout(xaxis_tickangle=-25)
+            fig.update_layout(xaxis_tickangle=-18)
+            fig = powerbi_layout(fig)
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("Payment method column not found.")
-        chart_card_end()
+        chart_container_end()
 
-    row3_col1, row3_col2 = st.columns(2)
+    bot1, bot2 = st.columns(2)
 
-    with row3_col1:
-        chart_card_start("Monthly Charges vs Churn")
+    with bot1:
+        chart_container_start("Monthly Charges vs Churn")
         if monthly_col:
             fig = px.box(
                 filtered,
                 x="churn_binary",
                 y=monthly_col,
                 color="churn_binary",
-                color_discrete_sequence=["#38bdf8", "#ef4444"]
+                color_discrete_map={0: PLOT_BLUE, 1: PLOT_RED}
             )
-            fig.update_xaxes(
-                tickvals=[0, 1],
-                ticktext=["Retained", "Churned"]
-            )
+            fig.update_xaxes(tickvals=[0, 1], ticktext=["Retained", "Churned"])
+            fig = powerbi_layout(fig)
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("Monthly charges column not found.")
-        chart_card_end()
+        chart_container_end()
 
-    with row3_col2:
-        chart_card_start("Tenure vs Churn")
+    with bot2:
+        chart_container_start("Tenure vs Churn")
         if tenure_col:
             fig = px.histogram(
                 filtered,
                 x=tenure_col,
                 color="churn_binary",
-                color_discrete_sequence=["#38bdf8", "#ef4444"]
+                barmode="overlay",
+                color_discrete_map={0: PLOT_BLUE, 1: PLOT_RED},
+                opacity=0.85
             )
+            fig = powerbi_layout(fig)
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("Tenure column not found.")
-        chart_card_end()
+        chart_container_end()
 
-    st.subheader("IBM Telco Dataset Preview")
+    subtle_title("IBM Telco Dataset Preview")
     st.dataframe(filtered.head(30), use_container_width=True)
 
-    st.markdown("---")
+    st.markdown("<br>", unsafe_allow_html=True)
 
-    if st.button("Train IBM Telco Model"):
+    train_col, _ = st.columns([1, 4])
+    with train_col:
+        train_clicked = st.button("Train IBM Telco Model")
+
+    if "telco_train_stdout" not in st.session_state:
+        st.session_state.telco_train_stdout = ""
+    if "telco_train_stderr" not in st.session_state:
+        st.session_state.telco_train_stderr = ""
+    if "telco_train_success" not in st.session_state:
+        st.session_state.telco_train_success = None
+
+    if train_clicked:
         with st.spinner("Training IBM Telco model..."):
             if os.path.exists("src/train_telco_model.py"):
                 out, err, code = run_command(f"{sys.executable} src/train_telco_model.py")
@@ -799,34 +994,41 @@ with tab2:
             else:
                 out, err, code = "", "train_telco_model.py not found.", 1
 
-            if code == 0:
-                st.success("IBM Telco model trained successfully.")
-                st.code(out)
-            else:
-                st.error("Training failed.")
-                st.code(err)
+            st.session_state.telco_train_stdout = out
+            st.session_state.telco_train_stderr = err
+            st.session_state.telco_train_success = (code == 0)
+
+    if st.session_state.telco_train_success is True:
+        st.success("IBM Telco model trained successfully.")
+    elif st.session_state.telco_train_success is False:
+        st.error("Training failed.")
+
+    if st.session_state.telco_train_stdout or st.session_state.telco_train_stderr:
+        with st.expander("View training logs"):
+            if st.session_state.telco_train_stdout:
+                st.code(st.session_state.telco_train_stdout)
+            if st.session_state.telco_train_stderr:
+                st.code(st.session_state.telco_train_stderr)
 
     metrics = read_json(TELCO_METRICS_PATH)
-
     if metrics:
-        st.subheader("IBM Telco Model Metrics")
-
-        m1, m2, m3, m4 = st.columns(4)
-        with m1:
+        subtle_title("IBM Telco Model Metrics")
+        mm1, mm2, mm3, mm4 = st.columns(4)
+        with mm1:
             kpi_card("Accuracy", metrics.get("accuracy", "NA"))
-        with m2:
+        with mm2:
             kpi_card("ROC-AUC", metrics.get("roc_auc", "NA"))
-        with m3:
+        with mm3:
             kpi_card("PR-AUC", metrics.get("pr_auc", "NA"))
-        with m4:
+        with mm4:
             kpi_card("Recall", metrics.get("recall", "NA"))
 
     if os.path.exists(TELCO_WATCHLIST_PATH):
-        st.subheader("IBM Telco Top 50 Churn Watchlist")
+        subtle_title("IBM Telco Top 50 Churn Watchlist")
         st.dataframe(pd.read_csv(TELCO_WATCHLIST_PATH), use_container_width=True)
 
-    st.subheader("IBM Telco Model Charts")
-
+    subtle_title("IBM Telco Model Charts")
+    im1, im2, im3, im4 = st.columns(4)
     telco_chart_files = [
         ("images/telco_confusion_matrix.png", "Confusion Matrix"),
         ("images/telco_roc_curve.png", "ROC Curve"),
@@ -834,45 +1036,37 @@ with tab2:
         ("images/telco_feature_importance.png", "Feature Importance")
     ]
 
-    cols = st.columns(4)
-
-    for col, (img, title) in zip(cols, telco_chart_files):
+    for col, (img, title) in zip([im1, im2, im3, im4], telco_chart_files):
         with col:
-            chart_card_start(title)
+            chart_container_start(title)
             if os.path.exists(img):
                 st.image(img, use_container_width=True)
             else:
                 st.info("Not available")
-            chart_card_end()
+            chart_container_end()
 
-    st.subheader("Top Churn Drivers Explanation")
+    subtle_title("Top Churn Drivers Explanation")
     st.markdown(
-        """
-        <div class="insight-box">
-        <b>Contract Type:</b> Month-to-month customers usually churn more because they have lower commitment.
-        </div>
-        <div class="insight-box">
-        <b>Tenure:</b> New customers are more likely to churn, so onboarding is important.
-        </div>
-        <div class="insight-box">
-        <b>Internet Service:</b> Service quality and plan type can influence churn behavior.
-        </div>
-        <div class="insight-box">
-        <b>Monthly Charges:</b> Higher bills may increase churn risk if perceived value is low.
+        f"""
+        <div class="insight-card">
+            <div class="insight-box"><b>Contract Type:</b> Month-to-month customers usually churn more because they have lower commitment.</div>
+            <div class="insight-box"><b>Tenure:</b> New customers are more likely to churn, so onboarding matters a lot.</div>
+            <div class="insight-box"><b>Internet Service:</b> Service quality and plan type can influence churn behavior.</div>
+            <div class="insight-box"><b>Monthly Charges:</b> Higher monthly bills may increase churn risk if value perception is low.</div>
         </div>
         """,
         unsafe_allow_html=True
     )
 
 
-# ==========================================================
-# TAB 3: SINGLE CUSTOMER PREDICTION
-# ==========================================================
-with tab3:
-    st.subheader("Predict One Customer")
+# =========================================================
+# PAGE 3: SINGLE CUSTOMER PREDICTION
+# =========================================================
+elif page == "🎯 Single Customer Prediction":
+    section_title("Predict One Customer")
+    st.markdown('<div class="small-note">Enter a customer profile to estimate churn probability and recommended retention action.</div>', unsafe_allow_html=True)
 
     ready = ensure_synthetic_ready()
-
     if not ready:
         st.error("Synthetic model/data is not ready.")
         st.stop()
@@ -883,32 +1077,33 @@ with tab3:
 
     model = joblib.load(SYNTHETIC_MODEL_PATH)
 
-    col1, col2, col3 = st.columns(3)
+    with st.container():
+        col1, col2, col3 = st.columns(3)
 
-    with col1:
-        age = st.slider("Age", 18, 80, 35)
-        tenure_months = st.slider("Tenure Months", 1, 72, 12)
-        billing_amount = st.number_input("Billing Amount", 10.0, 200.0, 75.0)
-        monthly_usage_hours = st.number_input("Monthly Usage Hours", 0.0, 150.0, 10.0)
-        active_days = st.slider("Active Days", 1, 30, 8)
+        with col1:
+            age = st.slider("Age", 18, 80, 35)
+            tenure_months = st.slider("Tenure Months", 1, 72, 12)
+            billing_amount = st.number_input("Billing Amount", 10.0, 200.0, 75.0)
+            monthly_usage_hours = st.number_input("Monthly Usage Hours", 0.0, 150.0, 10.0)
+            active_days = st.slider("Active Days", 1, 30, 8)
 
-    with col2:
-        login_count = st.number_input("Login Count", 0, 250, 15)
-        avg_session_min = st.number_input("Average Session Minutes", 1.0, 100.0, 15.0)
-        support_tickets = st.slider("Support Tickets", 0, 10, 2)
-        sla_breaches = st.slider("SLA Breaches", 0, 5, 1)
-        nps_score = st.slider("NPS Score", 0, 10, 4)
+        with col2:
+            login_count = st.number_input("Login Count", 0, 250, 15)
+            avg_session_min = st.number_input("Average Session Minutes", 1.0, 100.0, 15.0)
+            support_tickets = st.slider("Support Tickets", 0, 10, 2)
+            sla_breaches = st.slider("SLA Breaches", 0, 5, 1)
+            nps_score = st.slider("NPS Score", 0, 10, 4)
 
-    with col3:
-        last_payment_days_ago = st.slider("Last Payment Days Ago", 0, 35, 20)
-        last_campaign_days_ago = st.slider("Last Campaign Days Ago", 1, 90, 30)
-        email_opens = st.slider("Email Opens", 0, 20, 2)
-        email_clicks = st.slider("Email Clicks", 0, 20, 0)
-        plan_tier = st.selectbox("Plan Tier", ["Basic", "Standard", "Premium"])
-        region = st.selectbox("Region", ["North", "South", "East", "West"])
-        is_autopay = st.selectbox("Autopay", [0, 1])
-        is_discounted = st.selectbox("Discounted", [0, 1])
-        has_family_bundle = st.selectbox("Family Bundle", [0, 1])
+        with col3:
+            last_payment_days_ago = st.slider("Last Payment Days Ago", 0, 35, 20)
+            last_campaign_days_ago = st.slider("Last Campaign Days Ago", 1, 90, 30)
+            email_opens = st.slider("Email Opens", 0, 20, 2)
+            email_clicks = st.slider("Email Clicks", 0, 20, 0)
+            plan_tier = st.selectbox("Plan Tier", ["Basic", "Standard", "Premium"])
+            region = st.selectbox("Region", ["North", "South", "East", "West"])
+            is_autopay = st.selectbox("Autopay", [0, 1])
+            is_discounted = st.selectbox("Discounted", [0, 1])
+            has_family_bundle = st.selectbox("Family Bundle", [0, 1])
 
     row = pd.DataFrame([{
         "age": age,
@@ -942,39 +1137,34 @@ with tab3:
         prob = float(model.predict_proba(row)[0, 1])
         risk, action = risk_action(prob)
 
-        p1, p2, p3 = st.columns(3)
-
-        with p1:
+        rc1, rc2, rc3 = st.columns(3)
+        with rc1:
             kpi_card("Churn Probability", f"{prob * 100:.1f}%")
-        with p2:
+        with rc2:
             kpi_card("Risk Segment", risk)
-        with p3:
+        with rc3:
             kpi_card("Recommended Action", action)
 
-        if risk == "High Risk":
-            st.markdown(
-                "<div class='risk-high'>This customer needs immediate retention attention.</div>",
-                unsafe_allow_html=True
-            )
-        elif risk == "Medium Risk":
-            st.markdown(
-                "<div class='risk-medium'>This customer should receive a targeted engagement campaign.</div>",
-                unsafe_allow_html=True
-            )
-        else:
-            st.markdown(
-                "<div class='risk-low'>This customer is currently low risk.</div>",
-                unsafe_allow_html=True
-            )
+        st.markdown("<br>", unsafe_allow_html=True)
 
-        st.subheader("Input Customer Profile")
+        if risk == "High Risk":
+            risk_card("High Risk Alert", "Immediate retention attention required", HIGH_BG, HIGH_TEXT)
+        elif risk == "Medium Risk":
+            risk_card("Medium Risk Alert", "Targeted engagement campaign recommended", MED_BG, MED_TEXT)
+        else:
+            risk_card("Low Risk Alert", "Customer is currently stable", LOW_BG, LOW_TEXT)
+
+        subtle_title("Input Customer Profile")
         st.dataframe(row, use_container_width=True)
 
 
+# =========================================================
+# FOOTER
+# =========================================================
 st.markdown(
     """
     <div class="footer-note">
-    Built as an industry-oriented customer churn prediction project using Machine Learning, IBM Telco data, Streamlit, and retention analytics.
+        Built as an industry-oriented customer churn prediction project using Machine Learning, IBM Telco data, Streamlit, and retention analytics.
     </div>
     """,
     unsafe_allow_html=True
